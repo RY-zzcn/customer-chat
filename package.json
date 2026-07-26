@@ -1,0 +1,21 @@
+{
+  "name": "customer-chat",
+  "version": "1.0.0",
+  "description": "轻量级在线客服聊天系统 - 支持实时聊天、知识库、AI机器人、邮件通知",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io": "^4.7.5",
+    "better-sqlite3": "^11.3.0",
+    "nodemailer": "^6.9.15",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express-session": "^1.18.0",
+    "connect-sqlite3": "^0.9.15",
+    "uuid": "^10.0.0"
+  }
+}

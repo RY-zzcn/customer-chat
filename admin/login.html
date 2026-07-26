@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 - 登录</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 40px;
+      width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .login-card h1 {
+      font-size: 24px;
+      color: #1f2937;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .login-card .subtitle {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      color: #374151;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    .form-group input:focus {
+      border-color: #667eea;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.6; transform: none; }
+    .error {
+      color: #ef4444;
+      font-size: 13px;
+      text-align: center;
+      margin-top: 12px;
+      display: none;
+    }
+    .error.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>🔐 管理后台</h1>
+    <p class="subtitle">客服聊天系统 · 管理员登录</p>
+    <form onsubmit="login(event)">
+      <div class="form-group">
+        <label for="password">管理员密码</label>
+        <input type="password" id="password" placeholder="请输入管理员密码" required autofocus>
+      </div>
+      <button type="submit" id="loginBtn">登 录</button>
+      <div class="error" id="error">密码错误，请重试</div>
+    </form>
+  </div>
+
+  <script>
+    async function login(e) {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      const error = document.getElementById('error');
+      btn.disabled = true;
+      error.classList.remove('show');
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: document.getElementById('password').value }),
+        });
+        if (res.ok) {
+          window.location.href = '/admin';
+        } else {
+          error.classList.add('show');
+        }
+      } catch (err) {
+        error.textContent = '网络错误，请重试';
+        error.classList.add('show');
+      }
+      btn.disabled = false;
+    }
+  </script>
+</body>
+</html>
