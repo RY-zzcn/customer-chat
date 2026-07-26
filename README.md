@@ -132,7 +132,7 @@ customer-chat/
 ├── Dockerfile             # Docker 镜像构建（含 HEALTHCHECK）
 ├── docker-compose.yml     # Docker Compose 编排（含 healthcheck）
 ├── .env.example           # 环境变量配置模板（仅系统级配置）
-├── data/                  # 数据目录（chat.db + sessions.db + .session_secret）
+├── data/                  # 数据目录（chat.db，含聊天/会话/设置/知识库）
 ├── public/
 │   └── index.html          # 顾客端聊天页面
 └── admin/
@@ -146,7 +146,7 @@ customer-chat/
 |------|------|
 | 后端 | Node.js >= 18 + Express |
 | 实时通信 | Socket.IO (WebSocket) |
-| 数据库 | SQLite (better-sqlite3) |
+| 数据库 | SQLite (sql.js，纯 JS/WASM) |
 | 邮件 | Nodemailer（支持热重载） |
 | 限流 | express-rate-limit |
 | 前端 | 原生 HTML/CSS/JS |
