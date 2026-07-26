@@ -210,10 +210,120 @@
       color: #667eea;
       background: #f5f3ff;
     }
+
+    /* 连接状态提示条 */
+    .connection-banner {
+      display: none;
+      text-align: center;
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #fff;
+    }
+    .connection-banner.show { display: block; }
+    .connection-banner.disconnected {
+      background: #ef4444;
+    }
+    .connection-banner.reconnecting {
+      background: #f59e0b;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* 正在输入提示 */
+    .typing-indicator {
+      display: none;
+      align-self: flex-start;
+      padding: 8px 16px;
+      margin: 4px 0;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .typing-indicator.show { display: flex; align-items: center; gap: 6px; }
+    .typing-dots { display: flex; gap: 3px; }
+    .typing-dots span {
+      width: 6px;
+      height: 6px;
+      background: #9ca3af;
+      border-radius: 50%;
+      animation: typingBounce 1.4s ease-in-out infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* 昵称输入遮罩 */
+    .name-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .name-dialog {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px 24px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .name-dialog .icon { font-size: 40px; margin-bottom: 12px; }
+    .name-dialog h3 {
+      font-size: 18px;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+    .name-dialog p {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 20px;
+    }
+    .name-dialog input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 15px;
+      outline: none;
+      font-family: inherit;
+      margin-bottom: 16px;
+    }
+    .name-dialog input:focus { border-color: #667eea; }
+    .name-dialog button {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .name-dialog button:hover { opacity: 0.9; }
+    .name-dialog .skip {
+      background: none;
+      color: #9ca3af;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    .name-dialog .skip:hover { color: #6b7280; }
   </style>
 </head>
 <body>
   <div class="chat-container">
+    <!-- 连接状态提示条 -->
+    <div class="connection-banner" id="connectionBanner"></div>
+
     <!-- 头部 -->
     <div class="chat-header">
       <div class="avatar">💬</div>
@@ -230,6 +340,11 @@
         <h3 id="welcomeTitle">欢迎咨询</h3>
         <p id="welcomeText">请描述您的问题，客服看到后会尽快回复您。</p>
         <p id="contactEmailText" style="font-size:12px;margin-top:8px;display:none"></p>
+      </div>
+      <!-- 正在输入提示 -->
+      <div class="typing-indicator" id="typingIndicator">
+        <span>客服正在输入</span>
+        <div class="typing-dots"><span></span><span></span><span></span></div>
       </div>
     </div>
 
@@ -253,27 +368,144 @@
     </div>
   </div>
 
+  <!-- 昵称输入弹窗 -->
+  <div class="name-overlay" id="nameOverlay">
+    <div class="name-dialog">
+      <div class="icon">😊</div>
+      <h3>开始聊天前</h3>
+      <p>请输入您的昵称，方便客服为您服务</p>
+      <input type="text" id="nicknameInput" placeholder="请输入昵称（2-20字符）" maxlength="20">
+      <button onclick="confirmNickname()">开始对话</button>
+      <button class="skip" onclick="skipNickname()">跳过，匿名聊天</button>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
     const messagesDiv = document.getElementById('messages');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
-    const quickQuestionsDiv = document.getElementById('quickQuestions');
 
     let conversationId = localStorage.getItem('chat_conversation_id') || '';
     let visitorName = localStorage.getItem('chat_visitor_name') || '';
 
-    // 如果没有名称，生成一个
-    if (!visitorName) {
-      visitorName = '访客' + Math.random().toString(36).substring(2, 6).toUpperCase();
-      localStorage.setItem('chat_visitor_name', visitorName);
+    // ===== 昵称输入 =====
+    const nameOverlay = document.getElementById('nameOverlay');
+    const nicknameInput = document.getElementById('nicknameInput');
+
+    // 如果已有昵称且非自动生成的，跳过输入
+    if (visitorName && !visitorName.startsWith('访客')) {
+      nameOverlay.style.display = 'none';
+      joinChat();
+    } else {
+      // 预填如果之前自动生成过
+      if (visitorName) nicknameInput.value = visitorName;
+      nameOverlay.style.display = 'flex';
+      nicknameInput.focus();
     }
 
-    // 加入聊天
-    socket.emit('visitor:join', {
-      conversationId: conversationId || undefined,
-      name: visitorName,
+    function confirmNickname() {
+      const name = nicknameInput.value.trim();
+      if (name.length < 2) return alert('昵称至少需要2个字符');
+      visitorName = name;
+      localStorage.setItem('chat_visitor_name', visitorName);
+      nameOverlay.style.display = 'none';
+      joinChat();
+    }
+
+    function skipNickname() {
+      visitorName = '访客' + Math.random().toString(36).substring(2, 6).toUpperCase();
+      localStorage.setItem('chat_visitor_name', visitorName);
+      nameOverlay.style.display = 'none';
+      joinChat();
+    }
+
+    nicknameInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') confirmNickname();
+    });
+
+    function joinChat() {
+      // 加入聊天
+      socket.emit('visitor:join', {
+        conversationId: conversationId || undefined,
+        name: visitorName,
+      });
+      messageInput.focus();
+    }
+
+    // ===== 连接状态处理 =====
+    const connectionBanner = document.getElementById('connectionBanner');
+
+    function showConnectionBanner(state) {
+      connectionBanner.className = 'connection-banner';
+      if (state === 'disconnected') {
+        connectionBanner.className = 'connection-banner disconnected show';
+        connectionBanner.textContent = '⚠️ 连接已断开，正在尝试重新连接...';
+        disableInput(true);
+      } else if (state === 'reconnecting') {
+        connectionBanner.className = 'connection-banner reconnecting show';
+        connectionBanner.textContent = '🔄 重连中...';
+        disableInput(true);
+      } else if (state === 'connected') {
+        connectionBanner.className = 'connection-banner';
+        connectionBanner.textContent = '';
+        disableInput(false);
+      }
+    }
+
+    function disableInput(disabled) {
+      messageInput.disabled = disabled;
+      sendBtn.disabled = disabled;
+      if (disabled) {
+        messageInput.placeholder = '正在重新连接...';
+      } else {
+        messageInput.placeholder = '输入您的问题...';
+        messageInput.focus();
+      }
+    }
+
+    socket.on('connect', () => {
+      showConnectionBanner('connected');
+      // 重新加入
+      if (visitorName) {
+        socket.emit('visitor:join', {
+          conversationId,
+          name: visitorName,
+        });
+      }
+    });
+
+    socket.on('disconnect', () => {
+      showConnectionBanner('disconnected');
+    });
+
+    socket.io.on('reconnect_attempt', () => {
+      showConnectionBanner('reconnecting');
+    });
+
+    // ===== 正在输入提示 =====
+    const typingIndicator = document.getElementById('typingIndicator');
+    let typingTimeout = null;
+
+    socket.on('visitor:typing', (data) => {
+      if (data.typing) {
+        typingIndicator.classList.add('show');
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          typingIndicator.classList.remove('show');
+        }, 3000);
+      } else {
+        typingIndicator.classList.remove('show');
+      }
+    });
+
+    // 访客输入时通知管理员
+    messageInput.addEventListener('input', () => {
+      socket.emit('visitor:typing', { typing: messageInput.value.length > 0 });
+      // 自动调整输入框高度
+      messageInput.style.height = 'auto';
+      messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
     });
 
     // 接收历史消息
@@ -293,8 +525,21 @@
     // 接收新消息
     socket.on('visitor:message', (msg) => {
       clearWelcome();
+      typingIndicator.classList.remove('show');
       appendMessage(msg);
       scrollToBottom();
+    });
+
+    // 管理员在线/离线状态
+    socket.on('visitor:admin-status', (data) => {
+      const statusEl = document.getElementById('workingHoursText');
+      if (data.online) {
+        statusEl.textContent = '✅ 客服在线';
+        statusEl.style.color = '#22c55e';
+      } else {
+        statusEl.textContent = '💤 客服暂时离线，消息将会通过邮件通知';
+        statusEl.style.color = '';
+      }
     });
 
     // 发送消息
@@ -316,6 +561,7 @@
       scrollToBottom();
 
       socket.emit('visitor:message', { content });
+      socket.emit('visitor:typing', { typing: false });
 
       messageInput.value = '';
       messageInput.style.height = 'auto';
@@ -351,7 +597,9 @@
       }
 
       div.innerHTML = html;
-      messagesDiv.appendChild(div);
+      // 在 typing indicator 之前插入
+      const indicator = document.getElementById('typingIndicator');
+      messagesDiv.insertBefore(div, indicator);
     }
 
     function clearWelcome() {
@@ -375,15 +623,6 @@
         sendMessage();
       }
     }
-
-    // 自动调整输入框高度
-    messageInput.addEventListener('input', () => {
-      messageInput.style.height = 'auto';
-      messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
-    });
-
-    // 页面加载完成后聚焦输入框
-    messageInput.focus();
 
     // ===== 加载系统配置 =====
     fetch('/api/public/settings')

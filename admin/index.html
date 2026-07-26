@@ -26,6 +26,9 @@
       padding: 16px 20px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
     }
     .sidebar-header h2 {
       font-size: 17px;
@@ -35,6 +38,19 @@
       font-size: 12px;
       opacity: 0.85;
     }
+    .btn-logout {
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.35); }
     .sidebar-nav {
       display: flex;
       border-bottom: 1px solid #f0f0f0;
@@ -106,6 +122,18 @@
       color: #d1d5db;
       margin-top: 4px;
     }
+    .conv-search {
+      padding: 8px 12px;
+      margin: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 12px;
+      outline: none;
+      font-family: inherit;
+      width: calc(100% - 24px);
+      box-sizing: border-box;
+    }
+    .conv-search:focus { border-color: #667eea; }
     .empty-state {
       padding: 40px 20px;
       text-align: center;
@@ -385,20 +413,45 @@
     }
     .status-dot.on { background: #22c55e; }
     .status-dot.off { background: #d1d5db; }
+
+    .load-more-btn {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      margin: 8px 0;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #6b7280;
+      font-family: inherit;
+      transition: all .2s;
+      order: -1;
+    }
+    .load-more-btn:hover { background: #e5e7eb; color: #374151; }
+    .load-more-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .chat-area { overflow-anchor: none; }
+    .chat-anchor { overflow-anchor: auto; height: 1px; }
   </style>
 </head>
 <body>
   <!-- 侧边栏 -->
   <div class="sidebar">
     <div class="sidebar-header">
-      <h2>💬 客服管理后台</h2>
-      <div class="status" id="sidebarStatus">管理员在线</div>
+      <div>
+        <h2>💬 客服管理后台</h2>
+        <div class="status" id="sidebarStatus">管理员在线</div>
+      </div>
+      <button class="btn-logout" onclick="logout()">退出登录</button>
     </div>
     <div class="sidebar-nav">
       <button class="active" onclick="switchTab('chat')">会话列表</button>
       <button onclick="switchTab('knowledge')">知识库</button>
       <button onclick="switchTab('settings')">设置</button>
     </div>
+    <input type="text" class="conv-search" id="convSearch" placeholder="🔍 搜索会话..." oninput="filterConversations()">
     <div class="conversation-list" id="conversationList">
       <div class="empty-state">
         <div class="icon">📭</div>
@@ -445,7 +498,7 @@
 
       <div class="settings-section">
         <h4>🏪 基础信息配置</h4>
-        <p style="font-size:12px;color:#9ca3af;margin-bottom:12px">以下信息将展示在顾客聊天页面，部署后请在此填写真实信息</p>
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:12px">以下信息将展示在顾客聊天页面，配置后即时生效</p>
         <div class="form-row" style="flex-direction:column;gap:10px">
           <input type="text" id="settingSiteName" placeholder="站点名称（如：XX流量卡在线客服）">
           <input type="email" id="settingContactEmail" placeholder="联系邮箱（访客可看到此邮箱）">
@@ -456,32 +509,63 @@
       </div>
 
       <div class="settings-section">
+        <h4>📧 邮件通知配置</h4>
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:12px">配置 SMTP 邮件服务，有访客消息时将自动通知管理员（仅无人在线时发送）</p>
+        <div class="form-row" style="align-items:center;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-family:inherit">
+            <input type="checkbox" id="mailEnabled" onchange="toggleMailForm()"> 启用邮件通知
+          </label>
+          <button onclick="saveMailSettings()" style="margin-left:auto">💾 保存邮件配置</button>
+        </div>
+        <div id="mailFormFields" style="display:none">
+          <div class="form-row" style="flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            <input type="text" id="mailSmtpHost" placeholder="SMTP 服务器" style="flex:2;min-width:150px">
+            <input type="number" id="mailSmtpPort" placeholder="端口" style="flex:1;min-width:80px">
+            <select id="mailSmtpSecure" style="flex:1;min-width:80px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none">
+              <option value="true">SSL/TLS</option>
+              <option value="false">无加密</option>
+            </select>
+          </div>
+          <div class="form-row" style="gap:8px;margin-bottom:8px">
+            <input type="text" id="mailSmtpUser" placeholder="邮箱账号" style="flex:1">
+            <input type="password" id="mailSmtpPass" placeholder="SMTP 授权码" style="flex:1">
+          </div>
+          <div class="form-row" style="gap:8px;margin-bottom:8px">
+            <input type="email" id="mailNotifyEmail" placeholder="通知接收邮箱" style="flex:1">
+          </div>
+          <button onclick="testEmail()" id="testEmailBtn">📬 发送测试邮件</button>
+          <span id="mailTestResult" style="font-size:12px;margin-left:10px"></span>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h4>🤖 AI 机器人配置</h4>
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:12px">接入 DeepSeek / OpenAI 等大模型，无人值守时自动回复访客消息</p>
+        <div class="form-row" style="align-items:center;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-family:inherit">
+            <input type="checkbox" id="aiEnabled" onchange="toggleAIForm()"> 启用 AI 机器人
+          </label>
+          <button onclick="saveAISettings()" style="margin-left:auto">💾 保存 AI 配置</button>
+        </div>
+        <div id="aiFormFields" style="display:none">
+          <div class="form-row" style="gap:8px;margin-bottom:8px">
+            <input type="text" id="aiProvider" placeholder="平台名称（如：deepseek）" style="flex:1">
+            <input type="text" id="aiModel" placeholder="模型名称（如：deepseek-chat）" style="flex:1">
+          </div>
+          <div class="form-row" style="flex-direction:column;gap:8px;margin-bottom:8px">
+            <input type="text" id="aiApiUrl" placeholder="API 地址（如：https://api.deepseek.com/v1/chat/completions）">
+            <input type="password" id="aiApiKey" placeholder="API Key">
+          </div>
+          <span id="aiSaveResult" style="font-size:12px"></span>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h4>🔑 修改管理员密码</h4>
         <div class="form-row">
           <input type="password" id="oldPassword" placeholder="原密码">
-          <input type="password" id="newPassword" placeholder="新密码">
+          <input type="password" id="newPassword" placeholder="新密码（6-128位）">
           <button onclick="changePassword()">修改</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h4>📧 邮件通知</h4>
-        <div class="status-row">
-          <span>
-            <span class="status-dot" id="mailStatusDot"></span>
-            <span id="mailStatusText">检测中...</span>
-          </span>
-          <button onclick="testEmail()">发送测试邮件</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h4>🤖 AI 机器人</h4>
-        <div class="status-row">
-          <span>
-            <span class="status-dot" id="aiStatusDot"></span>
-            <span id="aiStatusText">检测中...</span>
-          </span>
         </div>
       </div>
 
@@ -501,39 +585,81 @@
 
     let activeConversationId = null;
     let currentTab = 'chat';
+    let allConversations = []; // 缓存全部会话用于搜索
+    let messageOffset = 0;
+    let messageTotal = 0;
+    const MESSAGE_PAGE_SIZE = 50;
+
+    // 恢复上次会话
+    const savedConvId = sessionStorage.getItem('activeConversationId');
+    if (savedConvId) activeConversationId = savedConvId;
 
     // 管理员加入
     socket.emit('admin:join');
 
+    async function logout() {
+      try {
+        await fetch('/api/admin/logout', { method: 'POST' });
+      } catch (e) {}
+      sessionStorage.removeItem('activeConversationId');
+      window.location.href = '/admin/login.html';
+    }
+
     socket.on('admin:init', (conversations) => {
+      allConversations = conversations;
       renderConversationList(conversations);
+
+      // 恢复上次打开的会话
+      const savedId = sessionStorage.getItem('activeConversationId');
+      if (savedId && conversations.some(c => c.id === savedId)) {
+        activeConversationId = savedId;
+        selectConversation(savedId);
+      }
     });
 
     socket.on('admin:visitor-joined', (conv) => {
+      allConversations.unshift(conv);
       addConversationItem(conv);
     });
 
     socket.on('admin:new-message', (msg) => {
-      updateConversationBadge(msg.conversation_id);
+      updateConversationInList(msg.conversation_id);
       if (activeConversationId === msg.conversation_id) {
         appendChatMessage(msg);
-        scrollChatBottom();
-      } else {
-        updateConversationInList(msg.conversation_id);
+        scrollChatBottomIfNeeded();
       }
     });
 
     socket.on('admin:conversation-update', (conv) => {
+      const idx = allConversations.findIndex(c => c.id === conv.id);
+      if (idx >= 0) allConversations[idx] = conv;
       updateConversationInList(conv.id);
     });
 
     socket.on('admin:conversation-data', (data) => {
-      renderChatMessages(data.messages);
+      messageOffset = data.messages ? data.messages.length : 0;
+      messageTotal = data.total || 0;
+      renderChatMessages(data.messages, data.hasMore);
     });
 
     socket.on('admin:message-sent', (msg) => {
       appendChatMessage(msg);
       scrollChatBottom();
+    });
+
+    // 访客正在输入提示
+    socket.on('admin:typing', (data) => {
+      const title = document.getElementById('chatTitle');
+      if (data.conversationId === activeConversationId) {
+        if (data.typing) {
+          title.textContent += ' ...正在输入';
+          title.style.color = '#667eea';
+        } else {
+          const name = title.textContent.replace(' ...正在输入', '');
+          title.textContent = name;
+          title.style.color = '#374151';
+        }
+      }
     });
 
     // ===== 会话列表 =====
@@ -596,8 +722,25 @@
       updateConversationInList(id);
     }
 
+    // 会话搜索/筛选
+    function filterConversations() {
+      const query = document.getElementById('convSearch').value.toLowerCase();
+      if (!query) {
+        renderConversationList(allConversations);
+        return;
+      }
+      const filtered = allConversations.filter(c =>
+        (c.visitor_name || '').toLowerCase().includes(query) ||
+        (c.id || '').toLowerCase().includes(query)
+      );
+      renderConversationList(filtered);
+    }
+
     async function selectConversation(id) {
       activeConversationId = id;
+      messageOffset = 0;
+      messageTotal = 0;
+      sessionStorage.setItem('activeConversationId', id);
 
       // 更新列表高亮
       document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
@@ -627,7 +770,9 @@
         .then(() => {
           const item = document.querySelector(`.conv-item[data-id="${activeConversationId}"]`);
           if (item) item.remove();
+          allConversations = allConversations.filter(c => c.id !== activeConversationId);
           activeConversationId = null;
+          sessionStorage.removeItem('activeConversationId');
           document.getElementById('chatTitle').textContent = '选择一个会话开始回复';
           document.getElementById('chatMessages').innerHTML = `
             <div class="no-chat-selected"><div class="icon">💬</div><p>请从左侧选择一个会话</p></div>`;
@@ -635,20 +780,67 @@
     }
 
     // ===== 聊天消息 =====
-    function renderChatMessages(messages) {
+    function renderChatMessages(messages, hasMore) {
       const el = document.getElementById('chatMessages');
       const noChat = el.querySelector('.no-chat-selected');
       if (noChat) noChat.remove();
 
-      el.innerHTML = messages.map(m => msgHTML(m)).join('');
+      // 如果有更多历史消息，先渲染"加载更多"按钮
+      let html = '';
+      if (hasMore) {
+        html += `<button class="load-more-btn" onclick="loadMoreMessages()">📜 加载更多历史消息</button>`;
+      }
+      html += messages.map(m => msgHTML(m)).join('');
+      // 滚动锚点
+      html += '<div class="chat-anchor"></div>';
+      el.innerHTML = html;
       scrollChatBottom();
+    }
+
+    // 加载更多历史消息
+    async function loadMoreMessages() {
+      if (!activeConversationId) return;
+      const btn = document.querySelector('.load-more-btn');
+      if (btn) { btn.disabled = true; btn.textContent = '加载中...'; }
+
+      try {
+        const res = await fetch(`/api/conversations/${activeConversationId}?limit=${MESSAGE_PAGE_SIZE}&offset=${messageOffset}`);
+        const data = await res.json();
+        if (data.messages && data.messages.length > 0) {
+          // 在现有消息之前插入
+          const el = document.getElementById('chatMessages');
+          const anchor = el.querySelector('.chat-anchor');
+          const anchorBefore = el.querySelector('.load-more-btn') || el.firstChild;
+
+          // 移除旧的 load-more 按钮
+          const oldBtn = el.querySelector('.load-more-btn');
+          if (oldBtn) oldBtn.remove();
+
+          // 如果有更多，重新添加 load-more
+          let prependHtml = '';
+          if (data.hasMore) {
+            prependHtml += `<button class="load-more-btn" onclick="loadMoreMessages()">📜 加载更多历史消息</button>`;
+          }
+          prependHtml += data.messages.map(m => msgHTML(m)).join('');
+
+          el.insertAdjacentHTML('afterbegin', prependHtml);
+          messageOffset += data.messages.length;
+          messageTotal = data.total;
+        }
+      } catch (err) {
+        console.error('加载更多消息失败:', err);
+      }
+      if (btn) { btn.disabled = false; btn.textContent = '📜 加载更多历史消息'; }
     }
 
     function appendChatMessage(msg) {
       const el = document.getElementById('chatMessages');
       const noChat = el.querySelector('.no-chat-selected');
       if (noChat) noChat.remove();
-      el.insertAdjacentHTML('beforeend', msgHTML(msg));
+      // 移除滚动锚点，添加消息，再添加锚点
+      const anchor = el.querySelector('.chat-anchor');
+      if (anchor) anchor.remove();
+      el.insertAdjacentHTML('beforeend', msgHTML(msg) + '<div class="chat-anchor"></div>');
     }
 
     function msgHTML(m) {
@@ -683,9 +875,38 @@
       }
     }
 
+    // 管理员打字提示
+    let adminTypingTimer = null;
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('adminInput');
+      if (input) {
+        input.addEventListener('input', () => {
+          socket.emit('admin:typing', { typing: input.value.length > 0 });
+          clearTimeout(adminTypingTimer);
+          adminTypingTimer = setTimeout(() => {
+            socket.emit('admin:typing', { typing: false });
+          }, 2000);
+        });
+      }
+    });
+
     function scrollChatBottom() {
       const el = document.getElementById('chatMessages');
       el.scrollTop = el.scrollHeight;
+    }
+
+    // 管理端自动滚动（仅在用户已在底部时）
+    document.getElementById('chatMessages').addEventListener('scroll', function() {
+      const el = this;
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      el.dataset.atBottom = atBottom ? '1' : '0';
+    });
+
+    function scrollChatBottomIfNeeded() {
+      const el = document.getElementById('chatMessages');
+      if (el.dataset.atBottom === '1') {
+        el.scrollTop = el.scrollHeight;
+      }
     }
 
     // ===== Tab 切换 =====
@@ -753,25 +974,12 @@
     // ===== 设置 =====
     async function loadSettings() {
       try {
-        const res = await fetch('/api/admin/status');
-        const status = await res.json();
-
-        const mailDot = document.getElementById('mailStatusDot');
-        const mailText = document.getElementById('mailStatusText');
-        mailDot.className = 'status-dot ' + (status.mailEnabled ? 'on' : 'off');
-        mailText.textContent = status.mailEnabled ? '邮件通知已启用' : '邮件通知未配置（请检查 .env 配置）';
-
-        const aiDot = document.getElementById('aiStatusDot');
-        const aiText = document.getElementById('aiStatusText');
-        aiDot.className = 'status-dot ' + (status.aiEnabled ? 'on' : 'off');
-        aiText.textContent = status.aiEnabled ? 'AI 机器人已启用' : 'AI 机器人未启用（设置 AI_ENABLED=true 以启用）';
-
         document.getElementById('visitorUrl').textContent = window.location.origin;
-
-        // 加载系统配置
         loadSystemSettings();
+        loadMailSettings();
+        loadAISettings();
       } catch (err) {
-        console.error(err);
+        console.error('加载设置失败:', err);
       }
     }
 
@@ -809,6 +1017,151 @@
       }
     }
 
+    // ===== 邮件配置 =====
+    async function loadMailSettings() {
+      try {
+        const res = await fetch('/api/admin/mail-settings');
+        const cfg = await res.json();
+        document.getElementById('mailEnabled').checked = cfg.enabled === true || cfg.enabled === 'true';
+        document.getElementById('mailSmtpHost').value = cfg.host || '';
+        document.getElementById('mailSmtpPort').value = cfg.port || '';
+        document.getElementById('mailSmtpSecure').value = cfg.secure ? 'true' : 'false';
+        document.getElementById('mailSmtpUser').value = cfg.user || '';
+        document.getElementById('mailSmtpPass').value = cfg.passConfigured ? '••••••' : '';
+        document.getElementById('mailNotifyEmail').value = cfg.notifyEmail || '';
+        toggleMailForm();
+      } catch (err) {
+        console.error('加载邮件配置失败:', err);
+      }
+    }
+
+    function toggleMailForm() {
+      const checked = document.getElementById('mailEnabled').checked;
+      document.getElementById('mailFormFields').style.display = checked ? 'block' : 'none';
+    }
+
+    async function saveMailSettings() {
+      const enabled = document.getElementById('mailEnabled').checked;
+      const host = document.getElementById('mailSmtpHost').value.trim();
+      const port = document.getElementById('mailSmtpPort').value;
+      const secure = document.getElementById('mailSmtpSecure').value;
+      const user = document.getElementById('mailSmtpUser').value.trim();
+      const pass = document.getElementById('mailSmtpPass').value;
+      const notifyEmail = document.getElementById('mailNotifyEmail').value.trim();
+
+      if (enabled) {
+        if (!host) return alert('请填写 SMTP 服务器地址');
+        if (!user) return alert('请填写邮箱账号');
+        if (!pass || pass === '••••••') {
+          // 如果密码是占位符，不传密码字段（保留原密码）
+        }
+      }
+
+      try {
+        const res = await fetch('/api/admin/mail-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled, host, port, secure, user, pass, notifyEmail }),
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert('邮件配置已保存并' + (result.active ? '启用' : '更新') + '！');
+          // 保存成功后密码字段显示占位符
+          if (pass && pass !== '••••••') {
+            document.getElementById('mailSmtpPass').value = '••••••';
+          }
+        } else {
+          alert('保存失败：' + (result.error || '未知错误'));
+        }
+      } catch (err) {
+        alert('请求失败：' + err.message);
+      }
+    }
+
+    async function testEmail() {
+      const btn = document.getElementById('testEmailBtn');
+      const resultEl = document.getElementById('mailTestResult');
+      btn.disabled = true;
+      btn.textContent = '发送中...';
+      resultEl.textContent = '';
+      try {
+        const res = await fetch('/api/admin/test-email', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          resultEl.textContent = '✅ 发送成功！请检查收件箱';
+          resultEl.style.color = '#22c55e';
+        } else {
+          resultEl.textContent = '❌ 发送失败：' + (data.error || '未知错误');
+          resultEl.style.color = '#ef4444';
+        }
+      } catch (err) {
+        resultEl.textContent = '❌ 请求失败：' + err.message;
+        resultEl.style.color = '#ef4444';
+      }
+      btn.disabled = false;
+      btn.textContent = '📬 发送测试邮件';
+    }
+
+    // ===== AI 配置 =====
+    async function loadAISettings() {
+      try {
+        const res = await fetch('/api/admin/ai-settings');
+        const cfg = await res.json();
+        document.getElementById('aiEnabled').checked = cfg.enabled === true || cfg.enabled === 'true';
+        document.getElementById('aiProvider').value = cfg.provider || '';
+        document.getElementById('aiModel').value = cfg.model || '';
+        document.getElementById('aiApiUrl').value = cfg.apiUrl || '';
+        document.getElementById('aiApiKey').value = cfg.keyConfigured ? '••••••' : '';
+        toggleAIForm();
+      } catch (err) {
+        console.error('加载AI配置失败:', err);
+      }
+    }
+
+    function toggleAIForm() {
+      const checked = document.getElementById('aiEnabled').checked;
+      document.getElementById('aiFormFields').style.display = checked ? 'block' : 'none';
+    }
+
+    async function saveAISettings() {
+      const enabled = document.getElementById('aiEnabled').checked;
+      const provider = document.getElementById('aiProvider').value.trim();
+      const model = document.getElementById('aiModel').value.trim();
+      const apiUrl = document.getElementById('aiApiUrl').value.trim();
+      const apiKey = document.getElementById('aiApiKey').value;
+      const resultEl = document.getElementById('aiSaveResult');
+
+      if (enabled) {
+        if (!apiUrl) return alert('请填写 API 地址');
+        if (!apiKey || apiKey === '••••••') {
+          // 保留原 key
+        }
+        if (!model) return alert('请填写模型名称');
+      }
+
+      try {
+        const res = await fetch('/api/admin/ai-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled, provider, model, apiUrl, apiKey }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          resultEl.textContent = '✅ AI 配置已保存并' + (data.active ? '启用' : '更新') + '！';
+          resultEl.style.color = '#22c55e';
+          if (apiKey && apiKey !== '••••••') {
+            document.getElementById('aiApiKey').value = '••••••';
+          }
+        } else {
+          resultEl.textContent = '❌ 保存失败：' + (data.error || '未知错误');
+          resultEl.style.color = '#ef4444';
+        }
+      } catch (err) {
+        resultEl.textContent = '❌ 请求失败：' + err.message;
+        resultEl.style.color = '#ef4444';
+      }
+    }
+
     function changePassword() {
       const oldPwd = document.getElementById('oldPassword').value;
       const newPwd = document.getElementById('newPassword').value;
@@ -829,21 +1182,6 @@
             alert('修改失败：' + (data.error || '未知错误'));
           }
         });
-    }
-
-    async function testEmail() {
-      const btn = event.target;
-      btn.disabled = true;
-      btn.textContent = '发送中...';
-      try {
-        const res = await fetch('/api/admin/test-email', { method: 'POST' });
-        const data = await res.json();
-        alert(data.success ? '测试邮件发送成功！请检查收件箱。' : '发送失败：' + (data.error || '未知错误'));
-      } catch (err) {
-        alert('请求失败：' + err.message);
-      }
-      btn.disabled = false;
-      btn.textContent = '发送测试邮件';
     }
 
     // ===== 工具函数 =====

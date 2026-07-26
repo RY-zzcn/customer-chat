@@ -1,27 +1,106 @@
-// AI 机器人模块 - 接入 DeepSeek / OpenAI API
-// 此模块为可选功能，需在 .env 中将 AI_ENABLED 设为 true
+// AI 机器人模块 - 接入 DeepSeek / OpenAI API（支持数据库驱动 + 热重载）
+// 配置可在管理后台实时修改，无需重启服务
 
 let aiConfig = null;
+let enabled = false;
+let dbRef = null; // 数据库引用，由 server.js 注入
 
+/**
+ * 设置数据库引用
+ */
+function setDb(db) {
+  dbRef = db;
+}
+
+/**
+ * 从设置源加载配置。优先级：数据库 > process.env
+ */
+function loadConfig() {
+  const get = (key, envKey, fallback) => {
+    if (dbRef) {
+      const dbVal = dbRef.getSetting(key);
+      if (dbVal) return dbVal;
+    }
+    if (envKey && process.env[envKey]) return process.env[envKey];
+    return fallback;
+  };
+
+  enabled = get('ai_enabled', null, null);
+  if (enabled === null) {
+    enabled = process.env.AI_ENABLED === 'true' ? 'true' : 'false';
+  }
+  const active = enabled === 'true' || enabled === true;
+
+  return {
+    active,
+    provider: get('ai_provider', 'AI_PROVIDER', 'deepseek'),
+    apiUrl: get('ai_api_url', 'AI_API_URL', 'https://api.deepseek.com/v1/chat/completions'),
+    apiKey: get('ai_api_key', 'AI_API_KEY', ''),
+    model: get('ai_model', 'AI_MODEL', 'deepseek-chat'),
+  };
+}
+
+/**
+ * 初始化/重新初始化 AI 配置
+ */
 function initAI() {
-  if (process.env.AI_ENABLED !== 'true') {
-    console.log('[AI] AI 机器人未启用（设置 AI_ENABLED=true 以启用）');
+  const config = loadConfig();
+
+  if (!config.active) {
+    console.log('[AI] AI 机器人未启用（可在管理后台开启）');
+    aiConfig = null;
     return false;
   }
-  if (!process.env.AI_API_KEY) {
-    console.warn('[AI] AI_API_KEY 未设置，AI 机器人无法使用');
+  if (!config.apiKey) {
+    console.warn('[AI] API Key 未设置，AI 机器人无法使用（请在管理后台配置）');
+    aiConfig = null;
     return false;
   }
 
   aiConfig = {
-    provider: process.env.AI_PROVIDER || 'deepseek',
-    apiUrl: process.env.AI_API_URL || 'https://api.deepseek.com/v1/chat/completions',
-    apiKey: process.env.AI_API_KEY,
-    model: process.env.AI_MODEL || 'deepseek-chat',
+    provider: config.provider,
+    apiUrl: config.apiUrl,
+    apiKey: config.apiKey,
+    model: config.model,
   };
 
   console.log('[AI] AI 机器人已就绪:', aiConfig.provider, '/', aiConfig.model);
   return true;
+}
+
+/**
+ * 热重载 AI 配置（从数据库重新读取）
+ */
+function reloadAI() {
+  const wasEnabled = !!aiConfig;
+  const result = initAI();
+  const nowEnabled = !!aiConfig;
+  if (wasEnabled !== nowEnabled) {
+    console.log(nowEnabled ? '[AI] AI 机器人已重新启用' : '[AI] AI 机器人已禁用');
+  }
+  return result;
+}
+
+/**
+ * 获取当前 AI 配置（不含 API Key 完整值）
+ */
+function getConfig() {
+  const config = loadConfig();
+  return {
+    enabled: config.active,
+    provider: config.provider,
+    apiUrl: config.apiUrl,
+    model: config.model,
+    // 不返回完整 key，仅返回是否已配置
+    keyConfigured: !!(config.apiKey && config.apiKey !== 'your_api_key_here'),
+  };
+}
+
+/**
+ * 检查 AI 是否可用
+ */
+function isEnabled() {
+  return !!aiConfig;
 }
 
 /**
@@ -47,6 +126,9 @@ async function getAIReply(message, history = []) {
   ];
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
     const response = await fetch(aiConfig.apiUrl, {
       method: 'POST',
       headers: {
@@ -59,7 +141,10 @@ async function getAIReply(message, history = []) {
         max_tokens: 500,
         temperature: 0.7,
       }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       console.error('[AI] API 请求失败:', response.status);
@@ -73,9 +158,13 @@ async function getAIReply(message, history = []) {
     }
     return reply || null;
   } catch (err) {
-    console.error('[AI] 调用异常:', err.message);
+    if (err.name === 'AbortError') {
+      console.error('[AI] 调用超时（15s）');
+    } else {
+      console.error('[AI] 调用异常:', err.message);
+    }
     return null;
   }
 }
 
-module.exports = { initAI, getAIReply };
+module.exports = { setDb, initAI, reloadAI, getConfig, isEnabled, getAIReply };

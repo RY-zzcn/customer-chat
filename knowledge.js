@@ -30,8 +30,7 @@ function matchKnowledge(message) {
  * 只在会话的第一条消息触发，避免重复自动回复
  */
 function shouldAutoReply(conversationId, message) {
-  const dbModule = require('./database');
-  const messages = dbModule.getMessages(conversationId);
+  const messages = db.getMessages(conversationId);
   // 只有访客的第一条消息才触发自动回复
   const visitorMessages = messages.filter(m => m.sender_type === 'visitor');
   if (visitorMessages.length > 1) return null;

@@ -2,10 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# 安装编译 better-sqlite3 所需的完整构建工具链
-RUN apk add --no-cache build-base python3
-
-# 先只拷贝 package.json，利用 Docker 缓存层
+# sql.js 是纯 JS 实现，无需编译工具，轻量快速
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev 2>/dev/null || npm install --production
 
@@ -15,5 +12,8 @@ COPY . .
 RUN mkdir -p /app/data
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', r => {process.exit(r.statusCode===200?0:1)})"
 
 CMD ["node", "server.js"]
