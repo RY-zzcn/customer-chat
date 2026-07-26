@@ -218,8 +218,8 @@
     <div class="chat-header">
       <div class="avatar">💬</div>
       <div class="info">
-        <h2>在线客服</h2>
-        <p>我们会在看到消息后尽快回复</p>
+        <h2 id="siteNameTitle">在线客服</h2>
+        <p id="workingHoursText">我们会在看到消息后尽快回复</p>
       </div>
     </div>
 
@@ -227,8 +227,9 @@
     <div class="chat-messages" id="messages">
       <div class="welcome-card">
         <div class="icon">👋</div>
-        <h3>欢迎咨询</h3>
-        <p>请描述您的问题，客服看到后会尽快回复您。<br>如长时间未回复，也可发送邮件至 ryzq@foxmail.com</p>
+        <h3 id="welcomeTitle">欢迎咨询</h3>
+        <p id="welcomeText">请描述您的问题，客服看到后会尽快回复您。</p>
+        <p id="contactEmailText" style="font-size:12px;margin-top:8px;display:none"></p>
       </div>
     </div>
 
@@ -383,6 +384,27 @@
 
     // 页面加载完成后聚焦输入框
     messageInput.focus();
+
+    // ===== 加载系统配置 =====
+    fetch('/api/public/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data.siteName) {
+          document.getElementById('siteNameTitle').textContent = data.siteName;
+        }
+        if (data.welcomeMessage) {
+          document.getElementById('welcomeText').textContent = data.welcomeMessage;
+        }
+        if (data.workingHours) {
+          document.getElementById('workingHoursText').textContent = '工作时间：' + data.workingHours;
+        }
+        if (data.contactEmail) {
+          const emailEl = document.getElementById('contactEmailText');
+          emailEl.textContent = '📧 联系邮箱：' + data.contactEmail;
+          emailEl.style.display = 'block';
+        }
+      })
+      .catch(() => { /* 配置加载失败不影响使用 */ });
   </script>
 </body>
 </html>

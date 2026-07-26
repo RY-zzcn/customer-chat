@@ -17,7 +17,12 @@ const ai = require('./ai');
 
 // ============ 初始化 ============
 const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+// 管理员密码 - 必须通过环境变量设置，不提供默认值
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD) {
+  console.error('❌ 错误：请在 .env 文件中设置 ADMIN_PASSWORD');
+  process.exit(1);
+}
 
 db.initDatabase();
 const mailEnabled = mailer.initMailer();
@@ -166,6 +171,36 @@ app.get('/api/admin/status', requireAdmin, (req, res) => {
     activeConversations: conversations.length,
     totalUnread,
   });
+});
+
+// 获取公开系统设置（无需登录，供前端页面使用）
+app.get('/api/public/settings', (req, res) => {
+  res.json({
+    contactEmail: db.getSetting('contact_email') || '',
+    siteName: db.getSetting('site_name') || '在线客服',
+    welcomeMessage: db.getSetting('welcome_message') || '您好！欢迎咨询，请问有什么可以帮您的？',
+    workingHours: db.getSetting('working_hours') || '9:00-21:00',
+  });
+});
+
+// 获取管理员系统设置
+app.get('/api/admin/settings', requireAdmin, (req, res) => {
+  res.json({
+    contactEmail: db.getSetting('contact_email') || '',
+    siteName: db.getSetting('site_name') || '在线客服',
+    welcomeMessage: db.getSetting('welcome_message') || '您好！欢迎咨询，请问有什么可以帮您的？',
+    workingHours: db.getSetting('working_hours') || '9:00-21:00',
+  });
+});
+
+// 更新系统设置
+app.post('/api/admin/settings', requireAdmin, (req, res) => {
+  const { contactEmail, siteName, welcomeMessage, workingHours } = req.body;
+  if (contactEmail !== undefined) db.setSetting('contact_email', contactEmail);
+  if (siteName !== undefined) db.setSetting('site_name', siteName);
+  if (welcomeMessage !== undefined) db.setSetting('welcome_message', welcomeMessage);
+  if (workingHours !== undefined) db.setSetting('working_hours', workingHours);
+  res.json({ success: true, message: '设置已保存' });
 });
 
 // 管理员页面路由

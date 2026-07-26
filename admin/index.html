@@ -444,6 +444,18 @@
       <h3>⚙️ 系统设置</h3>
 
       <div class="settings-section">
+        <h4>🏪 基础信息配置</h4>
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:12px">以下信息将展示在顾客聊天页面，部署后请在此填写真实信息</p>
+        <div class="form-row" style="flex-direction:column;gap:10px">
+          <input type="text" id="settingSiteName" placeholder="站点名称（如：XX流量卡在线客服）">
+          <input type="email" id="settingContactEmail" placeholder="联系邮箱（访客可看到此邮箱）">
+          <input type="text" id="settingWelcomeMessage" placeholder="欢迎消息（访客首次打开聊天窗口时显示）">
+          <input type="text" id="settingWorkingHours" placeholder="工作时间（如：9:00-21:00）">
+        </div>
+        <button onclick="saveSystemSettings()">💾 保存设置</button>
+      </div>
+
+      <div class="settings-section">
         <h4>🔑 修改管理员密码</h4>
         <div class="form-row">
           <input type="password" id="oldPassword" placeholder="原密码">
@@ -755,8 +767,45 @@
         aiText.textContent = status.aiEnabled ? 'AI 机器人已启用' : 'AI 机器人未启用（设置 AI_ENABLED=true 以启用）';
 
         document.getElementById('visitorUrl').textContent = window.location.origin;
+
+        // 加载系统配置
+        loadSystemSettings();
       } catch (err) {
         console.error(err);
+      }
+    }
+
+    async function loadSystemSettings() {
+      try {
+        const res = await fetch('/api/admin/settings');
+        const data = await res.json();
+        document.getElementById('settingSiteName').value = data.siteName || '';
+        document.getElementById('settingContactEmail').value = data.contactEmail || '';
+        document.getElementById('settingWelcomeMessage').value = data.welcomeMessage || '';
+        document.getElementById('settingWorkingHours').value = data.workingHours || '';
+      } catch (err) {
+        console.error('加载系统设置失败:', err);
+      }
+    }
+
+    async function saveSystemSettings() {
+      const data = {
+        siteName: document.getElementById('settingSiteName').value.trim(),
+        contactEmail: document.getElementById('settingContactEmail').value.trim(),
+        welcomeMessage: document.getElementById('settingWelcomeMessage').value.trim(),
+        workingHours: document.getElementById('settingWorkingHours').value.trim(),
+      };
+
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const result = await res.json();
+        alert(result.success ? '系统设置已保存！' : '保存失败：' + (result.error || '未知错误'));
+      } catch (err) {
+        alert('请求失败：' + err.message);
       }
     }
 

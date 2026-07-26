@@ -76,7 +76,7 @@ npm start
 | 页面 | 地址 | 说明 |
 |------|------|------|
 | 顾客聊天页 | `http://localhost:3000` | 将此链接生成二维码，顾客扫码即可聊天 |
-| 管理后台 | `http://localhost:3000/admin` | 默认密码 `admin123`，登录后请立即修改 |
+| 管理后台 | `http://localhost:3000/admin` | 密码请在 `.env` 中设置 `ADMIN_PASSWORD`，首次登录后请立即修改 |
 
 ## ⚙️ 配置说明
 
@@ -86,8 +86,8 @@ npm start
 # 服务端口
 PORT=3000
 
-# 管理员密码（首次启动后请立即修改）
-ADMIN_PASSWORD=admin123
+# 管理员密码（必填！首次部署请务必修改）
+ADMIN_PASSWORD=请修改此密码
 
 # 邮件通知配置（以 QQ 邮箱为例）
 SMTP_HOST=smtp.qq.com
