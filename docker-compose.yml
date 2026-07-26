@@ -2,7 +2,10 @@ version: '3.8'
 
 services:
   chat:
-    build: .
+    # 使用 GitHub Container Registry 镜像（推荐）
+    image: ghcr.io/ry-zzcn/customer-chat:latest
+    # 如需本地构建，注释掉上面 image，取消下面 build 注释
+    # build: .
     container_name: customer-chat
     ports:
       - "3000:3000"

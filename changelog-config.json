@@ -1,0 +1,11 @@
+{
+  "categories": [
+    { "title": "## 🚀 新功能", "labels": ["feature", "enhancement"] },
+    { "title": "## 🐛 修复", "labels": ["fix", "bug"] },
+    { "title": "## 📚 文档", "labels": ["documentation"] },
+    { "title": "## 🔧 其他", "labels": [] }
+  ],
+  "template": "${{CHANGELOG}}\n\n---\n\n**完整变更**: https://github.com/${{OWNER}}/${{REPOSITORY}}/compare/${{FROM_TAG}}...${{TO_TAG}}",
+  "ignore_labels": ["wip", "skip-changelog"],
+  "pr_template": "- ${{TITLE}} (#${{NUMBER}})"
+}
